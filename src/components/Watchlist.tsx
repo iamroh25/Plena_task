@@ -425,7 +425,7 @@ const Watchlist = () => {
           </button>
           <button
             onClick={() => setAddOpen(true)}
-            className="px-3 py-1 rounded bg-lime-400 text-black font-semibold hover:bg-lime-500"
+            className="px-3 py-1 rounded bg-[#A9E851] text-black font-semibold hover:bg-[#9BDD45]"
           >
             + Add Token
           </button>
