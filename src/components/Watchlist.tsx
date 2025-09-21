@@ -20,8 +20,10 @@ const Watchlist = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const gridRef = useRef<AgGridReact<any>>(null);
 
+  // trigger holdings editor for a given row from the actions menu
   const [editRowIdFromMenu, setEditRowIdFromMenu] = useState<string | null>(null);
 
+  // add token modal and refresh state
   const [addOpen, setAddOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -32,6 +34,7 @@ const Watchlist = () => {
       Number((MIN_HOLDING + Math.random() * (MAX_HOLDING - MIN_HOLDING)).toFixed(4))
     );
 
+  // Load from LS or fetch on mount
   useEffect(() => {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) {
@@ -43,13 +46,14 @@ const Watchlist = () => {
           setEditRowIdFromMenu(null);
           return;
         }
-      } catch(err) {
-        console.error(err)
+      } catch {
+        /* ignore; fall through to fetch */
       }
     }
     fetchData();
   }, []);
 
+  // Initial fetch (first load)
   const fetchData = async () => {
     const res = await api.get("/coins/markets", {
       params: {
@@ -75,8 +79,12 @@ const Watchlist = () => {
     localStorage.setItem(LS_KEY, JSON.stringify(merged));
     setCurrentPage(1);
     setEditRowIdFromMenu(null);
+
+    // 🔔 Notify Dashboard to re-read localStorage (fixes empty on first render)
+    dispatch(updateTime(new Date().toISOString()));
   };
 
+  // REFRESH: re-fetch current rows' prices, keep holdings
   const refreshPrices = async () => {
     try {
       setRefreshing(true);
@@ -110,11 +118,15 @@ const Watchlist = () => {
 
       setRowData(next);
       localStorage.setItem(LS_KEY, JSON.stringify(next));
+
+      // 🔔 Notify Dashboard to re-read localStorage after refresh
+      dispatch(updateTime(new Date().toISOString()));
     } finally {
       setRefreshing(false);
     }
   };
 
+  // Add selected tokens from modal
   const handleAddTokens = async (ids: string[]) => {
     try {
       if (!ids.length) return;
@@ -154,15 +166,18 @@ const Watchlist = () => {
     }
   };
 
+  // ---------- Holdings cell renderer ----------
   const HoldingsCellRenderer = (props: any) => {
     const { value, data } = props;
     const [isEditing, setIsEditing] = useState(false);
     const [tempHoldings, setTempHoldings] = useState<number>(value);
 
+    // Open editor when requested from the actions menu
     useEffect(() => {
       if (editRowIdFromMenu === data.id) {
         setIsEditing(true);
         setTempHoldings(value);
+        // NOTE: do NOT clear editRowIdFromMenu here; it causes a re-render that closes the editor
       }
     }, [editRowIdFromMenu, data.id, value]);
 
@@ -182,6 +197,7 @@ const Watchlist = () => {
         localStorage.setItem(LS_KEY, JSON.stringify(next));
         return next;
       });
+      // update time for dashboard
       dispatch(updateTime(new Date().toISOString()));
       setEditRowIdFromMenu(null);
       setIsEditing(false);
@@ -189,9 +205,7 @@ const Watchlist = () => {
 
     if (isEditing) {
       return (
-        <div
-          className="flex items-center gap-2"
-        >
+        <div className="flex items-center gap-2">
           <input
             type="number"
             value={tempHoldings}
@@ -201,7 +215,7 @@ const Watchlist = () => {
           />
           <button
             onClick={handleSave}
-            className="px-2 py-0.5 bg-lime-400 text-black rounded hover:bg-lime-500"
+            className="px-2 py-0.5 bg-[#A9E851] text-black rounded hover:bg-[#9BDD45]"
           >
             Save
           </button>
@@ -222,6 +236,7 @@ const Watchlist = () => {
     );
   };
 
+  // ---------- Actions menu (portal dropdown) ----------
   const ActionsCellRenderer = (props: any) => {
     const { data } = props;
     const [open, setOpen] = useState(false);
@@ -328,6 +343,7 @@ const Watchlist = () => {
     );
   };
 
+  // ---------- Columns ----------
   const columnDefs: Array<ColDef> = useMemo(
     () => [
       {
@@ -395,11 +411,16 @@ const Watchlist = () => {
     [editRowIdFromMenu]
   );
 
-  const defaultColDef = useMemo<ColDef>(() => ({
-    width: 206,         
-    resizable: true,     
-    sortable: true,    
-  }), []);
+  const defaultColDef = useMemo<ColDef>(
+    () => ({
+      width: 206,
+      resizable: true,
+      sortable: true,
+    }),
+    []
+  );
+
+  // ---------- Pagination ----------
   const totalPages = Math.ceil(rowData.length / PAGE_SIZE);
   const getPageData = useCallback(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
@@ -408,6 +429,7 @@ const Watchlist = () => {
 
   return (
     <div className="w-full text-white">
+      {/* Header inside content area */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <span className="text-green-400">★</span> Watchlist
@@ -432,6 +454,7 @@ const Watchlist = () => {
         </div>
       </div>
 
+      {/* AG Grid */}
       <div className="ag-theme-quartz-dark rounded-lg" style={{ height: 600, width: "100%" }}>
         <AgGridReact
           ref={gridRef}
@@ -446,6 +469,7 @@ const Watchlist = () => {
         />
       </div>
 
+      {/* Footer */}
       <div className="flex justify-between items-center text-sm text-gray-400 mt-3">
         <span>
           {(currentPage - 1) * PAGE_SIZE + 1}–
@@ -475,6 +499,7 @@ const Watchlist = () => {
         </span>
       </div>
 
+      {/* Add-token modal */}
       <TokenAddModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={handleAddTokens} />
     </div>
   );
