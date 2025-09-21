@@ -35,7 +35,7 @@ const colorPalette = [
 
 const Dashboard = () => {
   const [rows, setRows] = useState<Row[]>([]);
-  const lastUpdatedISO = useSelector((store: any) => store?.lastUpdated) as
+  const lastUpdatedISO = useSelector((store: any) => store?.lastUpdated.value) as
     | string
     | undefined;
 
